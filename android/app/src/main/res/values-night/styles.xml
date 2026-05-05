@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark Mode Launch Themes -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+
+    <!-- HydroSync branded dialog theme — Dark (Dusty Ocean palette) -->
+    <style name="HydroSyncDialog" parent="Theme.MaterialComponents.Dialog.Alert">
+        <!-- Dusty Ocean primary stays consistent in dark mode -->
+        <item name="colorPrimary">@color/hydro_primary</item>
+        <item name="colorPrimaryDark">@color/hydro_primary_dark</item>
+        <item name="colorPrimaryVariant">@color/hydro_primary_light</item>
+        <item name="colorOnPrimary">@color/hydro_on_primary</item>
+        <!-- Dark surface: deep navy background -->
+        <item name="colorSurface">@color/hydro_surface</item>
+        <item name="colorOnSurface">@color/hydro_on_surface</item>
+        <!-- Accent for legacy button tinting -->
+        <item name="colorAccent">@color/hydro_primary_light</item>
+        <!-- Rounded corners — same as light -->
+        <item name="dialogCornerRadius">20dp</item>
+    </style>
+</resources>

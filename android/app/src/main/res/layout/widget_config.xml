@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:paddingTop="120dp"
+    android:paddingHorizontal="40dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Widget settings"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="48dp"
+        android:layout_marginStart="8dp" />
+
+    <!-- PREVIEW AREA -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:background="@drawable/config_preview_bg"
+        android:layout_marginBottom="40dp"
+        android:layout_marginHorizontal="12dp"
+        android:padding="24dp">
+        
+        <LinearLayout
+            android:id="@+id/config_preview_pill"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_gravity="center"
+            android:background="@drawable/widget_bg_pill_white"
+            android:backgroundTint="#000000"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="24dp">
+            <TextView
+                android:id="@+id/config_preview_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1350 mL left"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:layout_marginBottom="4dp" />
+            <ProgressBar
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="19dp"
+                android:progressDrawable="@drawable/widget_progress_custom"
+                android:max="100"
+                android:progress="50" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- SETTINGS GROUPS -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Background color"
+        android:textColor="#B3FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"
+        android:layout_marginStart="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/config_section_bg"
+        android:orientation="vertical"
+        android:layout_marginHorizontal="8dp"
+        android:padding="4dp">
+        
+        <RadioGroup
+            android:id="@+id/config_theme_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <RadioButton
+                android:id="@+id/config_radio_auto"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:paddingStart="16dp"
+                android:text="Match phone setting"
+                android:textColor="#FFFFFF"
+                android:checked="true" />
+            <RadioButton
+                android:id="@+id/config_radio_light"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:paddingStart="16dp"
+                android:text="Light"
+                android:textColor="#FFFFFF" />
+            <RadioButton
+                android:id="@+id/config_radio_dark"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:paddingStart="16dp"
+                android:text="Dark"
+                android:textColor="#FFFFFF" />
+        </RadioGroup>
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Transparency"
+        android:textColor="#B3FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginTop="32dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginStart="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/config_section_bg"
+        android:gravity="center_vertical"
+        android:layout_marginHorizontal="8dp"
+        android:paddingHorizontal="16dp">
+        <SeekBar
+            android:id="@+id/config_transparency_seek"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="2"
+            android:progress="0" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="24dp">
+        <TextView
+            android:id="@+id/config_btn_cancel"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="56dp"
+            android:text="Cancel"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground" />
+        <TextView
+            android:id="@+id/config_btn_save"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="56dp"
+            android:text="Save"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground" />
+    </LinearLayout>
+
+</LinearLayout>

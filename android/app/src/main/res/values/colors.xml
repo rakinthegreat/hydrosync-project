@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background_adaptive">#FF000000</color>
+
+    <!-- Dusty Ocean Brand Palette -->
+    <color name="hydro_primary">#608DA1</color>       <!-- Dusty Ocean -->
+    <color name="hydro_primary_dark">#4A7082</color>  <!-- Deep Ocean -->
+    <color name="hydro_primary_light">#8AAFBF</color> <!-- Shallow Wave -->
+    <color name="hydro_on_primary">#FFFFFF</color>    <!-- White text on primary -->
+    <color name="hydro_surface">#1A2B32</color>       <!-- Dark surface -->
+    <color name="hydro_on_surface">#E8F4F8</color>    <!-- Light text on surface -->
+    <color name="hydro_surface_light">#F0F7FA</color> <!-- Light mode surface -->
+    <color name="hydro_on_surface_light">#1A2B32</color>
+    <color name="splash_background">@color/hydro_surface_light</color>
+</resources>

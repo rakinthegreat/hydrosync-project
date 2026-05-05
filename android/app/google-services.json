@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "73325700547",
+    "project_id": "hydrosync-tracker",
+    "storage_bucket": "hydrosync-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:73325700547:android:00e0469c998f20ed834976",
+        "android_client_info": {
+          "package_name": "com.rakin.hydrosync"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "73325700547-9i2i3bf4ubv9of6s521ovbh67fmkjror.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rakin.hydrosync",
+            "certificate_hash": "27b213c876f1e5c63a647017c3ee858a168e1f84"
+          }
+        },
+        {
+          "client_id": "73325700547-hlp5hidd9dkvdeumahojnm720itur0kp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7BHH0GRi5C6OZ85nRN6g_z2a0fV52Vyc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "73325700547-hlp5hidd9dkvdeumahojnm720itur0kp.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "73325700547-e809nns22bhipr6hq2lhpt363vncm23l.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.rakin.hydrosync"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
