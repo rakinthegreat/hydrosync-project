@@ -1720,7 +1720,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _buildSectionHeader('Debug & Validation', textSecondary),
               ScaleButton(
                 onTap: () async {
-                  await waterProvider.notificationService.testNotification();
+                  await waterProvider.notificationService.testNotification(waterProvider.settings!);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: const Text(
                         'Alarm scheduled! Locking your phone now is recommended for testing.'),

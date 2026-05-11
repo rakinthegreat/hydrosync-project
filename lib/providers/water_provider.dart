@@ -23,6 +23,7 @@ class WaterProvider with ChangeNotifier {
   List<WaterIntake> get intakes => _intakes;
   UserSettings? get settings => _settings;
   NotificationService get notificationService => _notifications;
+  StorageService get storage => _storage;
 
   Future<void> applyAiStrategy() async {
     if (_settings == null) return;
@@ -135,13 +136,21 @@ class WaterProvider with ChangeNotifier {
         print('[SYNC] Local data empty — restoring from cloud...');
         final cloud = await _sync.restoreAll();
         if (cloud != null) {
-          if (cloud.settings != null && _settings == null) {
+          bool dataRestored = false;
+          if (cloud.settings != null && (_settings == null || _settings!.weeklyPlan.isEmpty)) {
             _settings = cloud.settings;
             await _storage.saveSettings(_settings!);
+            dataRestored = true;
           }
           if (cloud.intakes != null && _intakes.isEmpty) {
             _intakes = cloud.intakes!;
             await _storage.saveIntakes(_intakes);
+          }
+
+          // CRITICAL: If we restored a plan, we MUST schedule it on the new device immediately
+          if (dataRestored && _settings!.weeklyPlan.isNotEmpty) {
+            print('[SYNC] Restored plan found. Arming local alarms...');
+            await _notifications.scheduleWeeklyPlan(_settings!.weeklyPlan, _settings!);
           }
         }
       }
@@ -206,6 +215,29 @@ class WaterProvider with ChangeNotifier {
       _settings!.hydrationDebt = debt;
       _settings!.isCatchingUp = false; // Reset catchup status for new day per user request
       _settings!.lastResetDate = now;
+
+      // --- NEW: Daily Plan Sync ---
+      // Update today's goals and rationale from the existing 7-day plan
+      final todayDateStr = now.toIso8601String().substring(0, 10);
+      try {
+        final todayPlan = _settings!.weeklyPlan.firstWhere(
+          (p) => p['date'] == todayDateStr,
+          orElse: () => {},
+        );
+        if (todayPlan.isNotEmpty) {
+          _settings!.dailyGoal = (todayPlan['dailyGoal'] as num).toInt();
+          _settings!.maxSafeDailyLimit = (todayPlan['maxSafeDailyLimit'] as num).toInt();
+          _settings!.aiDailyGoal = _settings!.dailyGoal;
+          _settings!.aiRationale = todayPlan['rationale'];
+          _settings!.aiSchedule = (todayPlan['schedule'] as List)
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          print('[DAILY RESET] Synced today\'s plan: ${_settings!.aiRationale}');
+        }
+      } catch (e) {
+        print('[DAILY RESET] Failed to sync today\'s specific plan: $e');
+      }
+
       _storage.saveSettings(_settings!);
     }
   }
@@ -215,17 +247,12 @@ class WaterProvider with ChangeNotifier {
     _intakes.add(intake);
     await _storage.saveIntakes(_intakes);
 
-    // Smart Notification Logic: Pause reminders if pacing is ahead of the awake day curve
+    // Smart Notification Logic: Deduct intake from the next scheduled reminder
     if (_settings != null) {
-      final totalAwake = _settings!.sleepingTime.hour - _settings!.wakingTime.hour;
-      final elapsed = DateTime.now().hour - _settings!.wakingTime.hour;
-      final awakeProgress = (elapsed / totalAwake).clamp(0.0, 1.0);
-      
-      if (progressPercentage >= awakeProgress) {
-        await notificationService.cancelNextNotification(
-            maxWindow: const Duration(hours: 1));
-        print('[SMART NOTIFICATIONS] User is pacing well (${(progressPercentage*100).toInt()}% vs ${(awakeProgress*100).toInt()}% of day). Upcoming reminders paused.');
-      }
+      await notificationService.deductFromNextNotification(
+          amount, 
+          maxWindow: const Duration(hours: 2), 
+          settings: _settings!);
     }
 
     _updateWidget();

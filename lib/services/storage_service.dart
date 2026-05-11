@@ -55,6 +55,20 @@ class StorageService {
     await prefs.setString(_lastIntakeBackupKey, date);
   }
 
+  static const String _lastNotificationTimeKey = 'last_notification_time';
+
+  Future<void> saveLastNotificationTime(DateTime time) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastNotificationTimeKey, time.toIso8601String());
+  }
+
+  Future<DateTime?> getLastNotificationTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? encoded = prefs.getString(_lastNotificationTimeKey);
+    if (encoded == null) return null;
+    return DateTime.parse(encoded);
+  }
+
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

@@ -12,12 +12,14 @@ class HydrationAlarmScreen extends StatefulWidget {
   final int? id;
   final int amount;
   final String note;
+  final DateTime? scheduledAt;
 
   const HydrationAlarmScreen({
     super.key,
     this.id,
     required this.amount,
     this.note = "Time to hydrate!",
+    this.scheduledAt,
   });
 
   @override
@@ -28,10 +30,13 @@ class _HydrationAlarmScreenState extends State<HydrationAlarmScreen>
     with TickerProviderStateMixin {
   late AnimationController _waveController;
   late AnimationController _pulseController;
+  DateTime? _previousNotificationTime;
 
   @override
   void initState() {
     super.initState();
+    _loadPreviousNotificationTime();
+    _saveCurrentNotificationTime();
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -58,16 +63,49 @@ class _HydrationAlarmScreenState extends State<HydrationAlarmScreen>
     super.dispose();
   }
 
+  Future<void> _loadPreviousNotificationTime() async {
+    final time = await waterProvider.storage.getLastNotificationTime();
+    if (mounted) {
+      setState(() {
+        _previousNotificationTime = time;
+      });
+    }
+  }
+
+  Future<void> _saveCurrentNotificationTime() async {
+    if (widget.scheduledAt != null) {
+      await waterProvider.storage.saveLastNotificationTime(widget.scheduledAt!);
+    } else {
+      await waterProvider.storage.saveLastNotificationTime(DateTime.now());
+    }
+  }
+
+  WaterProvider get waterProvider =>
+      Provider.of<WaterProvider>(context, listen: false);
+
   @override
   Widget build(BuildContext context) {
     final waterProvider = Provider.of<WaterProvider>(context, listen: false);
     final isDark = waterProvider.settings?.isDarkMode ?? true;
 
-    // Calculate time since last log
-    String timeSinceText = "your last notification";
+    // Calculate time since last activity (drink OR previous notification)
+    DateTime? lastActivityTime;
+
+    // 1. Check last drink
     if (waterProvider.intakes.isNotEmpty) {
-      final lastLog = waterProvider.intakes.last.timestamp;
-      timeSinceText = DateFormat('h:mm a').format(lastLog);
+      lastActivityTime = waterProvider.intakes.last.timestamp;
+    }
+
+    // 2. Check last notification (from state)
+    if (_previousNotificationTime != null) {
+      if (lastActivityTime == null || _previousNotificationTime!.isAfter(lastActivityTime)) {
+        lastActivityTime = _previousNotificationTime;
+      }
+    }
+
+    String timeSinceText = "your last activity";
+    if (lastActivityTime != null) {
+      timeSinceText = DateFormat('h:mm a').format(lastActivityTime);
     }
 
     // Theme Colors
@@ -352,7 +390,7 @@ class _HydrationAlarmScreenState extends State<HydrationAlarmScreen>
                       TextButton(
                         onPressed: () async {
                           waterProvider.notificationService
-                              .snooze(widget.amount, widget.note);
+                              .snooze(widget.amount, widget.note, waterProvider.settings!);
                           HapticFeedback.mediumImpact();
                           // Background app after snoozing
                           await Future.delayed(

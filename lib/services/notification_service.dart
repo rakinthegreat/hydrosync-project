@@ -63,6 +63,9 @@ class NotificationService {
               id: details.id,
               amount: data['amount'],
               note: data['note'] ?? "Time to hydrate!",
+              scheduledAt: data['scheduledAt'] != null 
+                ? DateTime.parse(data['scheduledAt']) 
+                : DateTime.now(),
             ),
           ),
         );
@@ -147,8 +150,8 @@ class NotificationService {
     print('[NOTIFICATIONS] Completed scheduling for the week. Total: ${id - 1}');
   }
 
-  Future<void> testNotification() async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+  Future<void> testNotification(UserSettings settings) async {
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'ai_hydration_alarm_channel',
       'Hydration Alarms',
       channelDescription: 'High-priority full-screen hydration reminders',
@@ -157,9 +160,12 @@ class NotificationService {
       fullScreenIntent: true,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
+      showWhen: true,
+      playSound: settings.enableAlarmSound,
+      additionalFlags: settings.insistentAlarm ? Int32List.fromList([4]) : null,
     );
 
-    const NotificationDetails platformDetails =
+    final NotificationDetails platformDetails =
         NotificationDetails(android: androidDetails);
 
     final scheduledTime = DateTime.now().add(const Duration(seconds: 10));
@@ -181,8 +187,8 @@ class NotificationService {
     print('[NOTIFICATIONS] Test notification scheduled for 10s from now.');
   }
 
-  Future<void> snooze(int amount, String note) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+  Future<void> snooze(int amount, String note, UserSettings settings) async {
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'ai_hydration_alarm_channel',
       'Hydration Alarms',
       channelDescription: 'High-priority full-screen hydration reminders',
@@ -191,9 +197,12 @@ class NotificationService {
       fullScreenIntent: true,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
+      showWhen: true,
+      playSound: settings.enableAlarmSound,
+      additionalFlags: settings.insistentAlarm ? Int32List.fromList([4]) : null,
     );
 
-    const NotificationDetails platformDetails =
+    final NotificationDetails platformDetails =
         NotificationDetails(android: androidDetails);
 
     final scheduledTime = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 10));
@@ -222,8 +231,9 @@ class NotificationService {
     String body,
     DateTime scheduledTime,
     Map<String, dynamic> payloadData,
+    UserSettings settings,
   ) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'ai_hydration_alarm_channel',
       'Hydration Alarms',
       channelDescription: 'High-priority full-screen hydration reminders',
@@ -232,9 +242,12 @@ class NotificationService {
       fullScreenIntent: true,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
+      showWhen: true,
+      playSound: settings.enableAlarmSound,
+      additionalFlags: settings.insistentAlarm ? Int32List.fromList([4]) : null,
     );
 
-    const NotificationDetails platformDetails =
+    final NotificationDetails platformDetails =
         NotificationDetails(android: androidDetails);
 
     await _notificationsPlugin.zonedSchedule(
@@ -257,14 +270,14 @@ class NotificationService {
     print('[NOTIFICATIONS] Cancelled notification with ID: $id');
   }
 
-  Future<void> cancelNextNotification({Duration? maxWindow}) async {
+  Future<void> deductFromNextNotification(int loggedAmount, {Duration? maxWindow, required UserSettings settings}) async {
     final List<PendingNotificationRequest> pending =
         await _notificationsPlugin.pendingNotificationRequests();
     if (pending.isEmpty) return;
 
-    // Find the notification with the earliest 'scheduledAt' timestamp in the payload
     PendingNotificationRequest? earliest;
     DateTime? earliestTime;
+    Map<String, dynamic>? earliestData;
 
     for (var request in pending) {
       if (request.payload != null) {
@@ -275,22 +288,45 @@ class NotificationService {
             if (earliestTime == null || time.isBefore(earliestTime)) {
               earliestTime = time;
               earliest = request;
+              earliestData = data;
             }
           }
         } catch (_) {}
       }
     }
 
-    if (earliest != null && earliestTime != null) {
-      // Only cancel if it's within the allowed window
-      if (maxWindow == null ||
-          earliestTime.isBefore(DateTime.now().add(maxWindow))) {
+    if (earliest != null && earliestTime != null && earliestData != null) {
+      // Only process if it's within the allowed window
+      if (maxWindow != null && earliestTime.isAfter(DateTime.now().add(maxWindow))) {
+        return;
+      }
+
+      final int originalAmount = earliestData['amount'] ?? 0;
+      final int remainingAmount = originalAmount - loggedAmount;
+
+      if (remainingAmount <= 50) {
+        // Amount is trivial or fully satisfied, cancel it
         await _notificationsPlugin.cancel(id: earliest.id);
-        print(
-            '[NOTIFICATIONS] Pacing well: Cancelled next reminder (ID: ${earliest.id}) at $earliestTime');
+        print('[NOTIFICATIONS] Activity satisfied: Cancelled reminder (ID: ${earliest.id}) for ${originalAmount}mL');
       } else {
-        print(
-            '[NOTIFICATIONS] Pacing well, but next reminder is outside the ${maxWindow.inHours}h window ($earliestTime). Skipping cancellation.');
+        // Significant amount remains, reschedule with the new amount
+        await _notificationsPlugin.cancel(id: earliest.id);
+        
+        final updatedPayload = {
+          ...earliestData,
+          'amount': remainingAmount,
+          'note': "Remaining balance: ${remainingAmount}mL from your earlier target.",
+        };
+
+        await scheduleNotification(
+          earliest.id,
+          'HydroSync Adjusted Alert',
+          "Still need ${remainingAmount}mL to stay on track.",
+          earliestTime,
+          updatedPayload,
+          settings,
+        );
+        print('[NOTIFICATIONS] Partial intake: Adjusted next reminder (ID: ${earliest.id}) from ${originalAmount}mL to ${remainingAmount}mL');
       }
     }
   }

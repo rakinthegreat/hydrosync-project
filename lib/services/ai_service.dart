@@ -65,32 +65,78 @@ Note: Provide 7 days of data starting from the current date.
     final startTime = DateTime.now();
 
     Map<String, dynamic>? result;
-    if (settings.aiEngine == 'Gemini') {
-      result = await _generateWithGemini(settings);
-    } else {
-      result = await _generateWithNvidia(settings);
+
+    // --- PHASE 1: PRIMARY ENGINE ATTEMPTS ---
+    // We try the primary engine multiple times, especially for 503s.
+    int primaryAttempts = 0;
+    const int maxPrimaryAttempts = 4;
+
+    while (primaryAttempts < maxPrimaryAttempts) {
+      primaryAttempts++;
+      
+      if (settings.aiEngine == 'Gemini') {
+        result = await _generateWithGemini(settings);
+      } else {
+        result = await _generateWithNvidia(settings);
+      }
+
+      if (_isValidPlan(result)) {
+        return _finalizePlan(result, startTime);
+      }
+
+      // If we got here, it failed (either null/503 or bad format)
+      if (primaryAttempts < maxPrimaryAttempts) {
+        // Progressive backoff: 5s, 10s, 30s
+        int delaySecs = (primaryAttempts == 1) ? 5 : (primaryAttempts == 2) ? 10 : 30;
+        print('[AI-RETRY] Primary engine failed/busy. Waiting ${delaySecs}s before attempt ${primaryAttempts + 1}/$maxPrimaryAttempts...');
+        await Future.delayed(Duration(seconds: delaySecs));
+      }
     }
 
-    final duration = DateTime.now().difference(startTime);
-    if (result != null &&
-        result.containsKey('weeklyPlan') &&
-        (result['weeklyPlan'] as List).isNotEmpty) {
-      final weeklyPlan = result['weeklyPlan'] as List;
-      final firstDay = weeklyPlan.first;
-      print('[AI TELEMETRY] Success! Latency: ${duration.inMilliseconds}ms');
-      print('[AI TELEMETRY] Target Goal: ${firstDay["dailyGoal"]} mL');
+    // --- PHASE 2: FALLBACK TO KIMI ---
+    print('[AI-FALLBACK] Primary engines exhausted. Engaging Kimi safety net (moonshotai/kimi-k2-instruct-0905)...');
+    result = await _generateWithKimiFallback(settings);
 
-      print('[AI PLAN OVERVIEW]');
-      for (var day in weeklyPlan) {
-        final schedule = day['schedule'] as List;
-        print(
-            '  • ${day['date']}: ${day['dailyGoal']}mL (${schedule.length} reminders)');
+    if (_isValidPlan(result)) {
+      print('[AI-FALLBACK] Success via Kimi Safety Net!');
+      return _finalizePlan(result, startTime);
+    }
+
+    // --- PHASE 3: FATAL FAILURE ---
+    final duration = DateTime.now().difference(startTime);
+    print('[AI TELEMETRY] Critical Failure after ${duration.inMilliseconds}ms');
+    print('=============================================\n');
+    return null;
+  }
+
+  bool _isValidPlan(Map<String, dynamic>? result) {
+    if (result == null) return false;
+    try {
+      if (!result.containsKey('weeklyPlan')) return false;
+      final plan = result['weeklyPlan'];
+      if (plan is! List || plan.isEmpty) return false;
+      
+      final firstDay = plan.first;
+      if (firstDay is! Map || !firstDay.containsKey('dailyGoal') || !firstDay.containsKey('schedule')) {
+        return false;
       }
-    } else if (result != null) {
-      print('[AI TELEMETRY] Success! Latency: ${duration.inMilliseconds}ms');
-      print('[AI TELEMETRY] Non-standard response format.');
-    } else {
-      print('[AI TELEMETRY] Failed after ${duration.inMilliseconds}ms');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Map<String, dynamic>? _finalizePlan(Map<String, dynamic>? result, DateTime startTime) {
+    final duration = DateTime.now().difference(startTime);
+    final weeklyPlan = result!['weeklyPlan'] as List;
+    final firstDay = weeklyPlan.first;
+    
+    print('[AI TELEMETRY] Success! Latency: ${duration.inMilliseconds}ms');
+    print('[AI TELEMETRY] Target Goal: ${firstDay["dailyGoal"]} mL');
+    print('[AI PLAN OVERVIEW]');
+    for (var day in weeklyPlan) {
+      final schedule = day['schedule'] as List;
+      print('  • ${day['date']}: ${day['dailyGoal']}mL (${schedule.length} reminders)');
     }
     print('=============================================\n');
     return result;
@@ -116,14 +162,46 @@ Note: Provide 7 days of data starting from the current date.
           'temperature': 0.5,
           'max_tokens': 4096,
         }),
-      );
+      ).timeout(const Duration(seconds: 45));
 
       lastRawResponse = response.body;
       await _storage.saveLastAiResponse(lastRawResponse!);
 
       return _parseResponse(response);
     } catch (e) {
-      print('NVIDIA Service Exception: $e');
+      print('[NVIDIA] Service Error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _generateWithKimiFallback(
+      UserSettings settings) async {
+    try {
+      final userPrompt = _buildUserPrompt(settings);
+
+      final response = await http.post(
+        Uri.parse('$_nvidiaBaseUrl/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer $_nvidiaApiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'moonshotai/kimi-k2-instruct-0905',
+          'messages': [
+            {'role': 'system', 'content': _systemPrompt},
+            {'role': 'user', 'content': userPrompt},
+          ],
+          'temperature': 0.3,
+          'max_tokens': 4096,
+        }),
+      ).timeout(const Duration(seconds: 45));
+
+      lastRawResponse = response.body;
+      await _storage.saveLastAiResponse(lastRawResponse!);
+
+      return _parseResponse(response);
+    } catch (e) {
+      print('[KIMI FALLBACK] Critical Error: $e');
       return null;
     }
   }
@@ -138,75 +216,84 @@ Note: Provide 7 days of data starting from the current date.
 
       for (int i = 0; i < keys.length; i++) {
         final currentKey = keys[i];
-        final response = await http.post(
-          Uri.parse('$_geminiBaseUrl?key=$currentKey'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'parts': [
-                  {'text': userPrompt}
-                ]
-              }
-            ],
-          }),
-        );
+        try {
+          final response = await http.post(
+            Uri.parse('$_geminiBaseUrl?key=$currentKey'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': userPrompt}
+                  ]
+                }
+              ],
+            }),
+          ).timeout(const Duration(seconds: 45));
 
-        lastResponse = response;
+          lastResponse = response;
 
-        if (response.statusCode == 200) {
-          lastRawResponse = response.body;
-          await _storage.saveLastAiResponse(lastRawResponse!);
-          return _parseGeminiResponse(response);
-        } else if (response.statusCode == 429) {
-          print(
-              '[AI SERVICE] Gemini Key ${i + 1} exhausted. Trying next key...');
+          if (response.statusCode == 200) {
+            lastRawResponse = response.body;
+            await _storage.saveLastAiResponse(lastRawResponse!);
+            return _parseGeminiResponse(response);
+          } else if (response.statusCode == 429) {
+            print('[AI SERVICE] Gemini Key ${i + 1} exhausted. Trying next key...');
+            continue;
+          } else if (response.statusCode == 503) {
+            print('[AI SERVICE] Gemini 503 error (Service Unavailable).');
+            return null; // Return null to trigger retry in generateHydrationPlan
+          } else {
+            print('[AI SERVICE] Gemini API Error (${response.statusCode}): ${response.body}');
+            continue; 
+          }
+        } catch (e) {
+          print('[AI SERVICE] Gemini Request Exception: $e');
           continue;
-        } else {
-          // Other error, log and break loop
-          print('[AI SERVICE] Gemini API Error (${response.statusCode}): ${response.body}');
-          break;
         }
       }
 
-      // If we reach here, all keys failed or a fatal error occurred
       if (lastResponse != null) {
         lastRawResponse = lastResponse.body;
         await _storage.saveLastAiResponse(lastRawResponse!);
       }
       return null;
     } catch (e) {
-      print('Gemini Service Exception: $e');
+      print('Gemini Service Fatal Exception: $e');
       return null;
     }
   }
 
   Map<String, dynamic>? _parseGeminiResponse(http.Response response) {
-    final data = jsonDecode(response.body);
+    try {
+      final data = jsonDecode(response.body);
 
-    if (data['candidates'] == null || (data['candidates'] as List).isEmpty) {
-      print('Gemini API Error: No candidates returned');
-      return null;
+      if (data['candidates'] == null || (data['candidates'] as List).isEmpty) {
+        print('Gemini API Error: No candidates returned');
+        return null;
+      }
+
+      final candidate = data['candidates'][0];
+      if (candidate['content'] == null ||
+          candidate['content']['parts'] == null) {
+        print('Gemini API Error: Content or Parts missing');
+        return null;
+      }
+
+      final content = candidate['content']['parts'][0]['text']?.toString();
+      if (content == null) return null;
+
+      // Robust extraction: find the first { and last }
+      final startIdx = content.indexOf('{');
+      final endIdx = content.lastIndexOf('}') + 1;
+
+      if (startIdx != -1 && endIdx != -1) {
+        final jsonStr = content.substring(startIdx, endIdx);
+        return jsonDecode(jsonStr);
+      }
+    } catch (e) {
+      print('[AI PARSE] Gemini Response Error (Likely truncated): $e');
     }
-
-    final candidate = data['candidates'][0];
-    if (candidate['content'] == null || candidate['content']['parts'] == null) {
-      print('Gemini API Error: Content or Parts missing');
-      return null;
-    }
-
-    final content = candidate['content']['parts'][0]['text']?.toString();
-    if (content == null) return null;
-
-    // Robust extraction: find the first { and last }
-    final startIdx = content.indexOf('{');
-    final endIdx = content.lastIndexOf('}') + 1;
-
-    if (startIdx != -1 && endIdx != -1) {
-      final jsonStr = content.substring(startIdx, endIdx);
-      return jsonDecode(jsonStr);
-    }
-
     return null;
   }
 
@@ -236,26 +323,31 @@ Generate a 7-day hydration plan starting from today.
   }
 
   Map<String, dynamic>? _parseResponse(http.Response response) {
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+    try {
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-      if (data['choices'] == null || (data['choices'] as List).isEmpty) {
-        print('NVIDIA API Error: No choices returned');
+        if (data['choices'] == null || (data['choices'] as List).isEmpty) {
+          print('NVIDIA/Kimi API Error: No choices returned');
+          return null;
+        }
+
+        final content = data['choices'][0]['message']['content']?.toString();
+        if (content == null) return null;
+
+        final startIdx = content.indexOf('{');
+        final endIdx = content.lastIndexOf('}') + 1;
+        final jsonStr = (startIdx != -1 && endIdx != 0)
+            ? content.substring(startIdx, endIdx)
+            : content;
+
+        return jsonDecode(jsonStr);
+      } else {
+        print('AI API Error: ${response.statusCode} - ${response.body}');
         return null;
       }
-
-      final content = data['choices'][0]['message']['content']?.toString();
-      if (content == null) return null;
-
-      final startIdx = content.indexOf('{');
-      final endIdx = content.lastIndexOf('}') + 1;
-      final jsonStr = (startIdx != -1 && endIdx != 0)
-          ? content.substring(startIdx, endIdx)
-          : content;
-
-      return jsonDecode(jsonStr);
-    } else {
-      print('AI API Error: ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      print('[AI PARSE] Response Error (Likely truncated): $e');
       return null;
     }
   }

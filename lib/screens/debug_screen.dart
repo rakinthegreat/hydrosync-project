@@ -37,23 +37,30 @@ class _DebugScreenState extends State<DebugScreen> {
 
   void _showNotificationDialog({PendingNotificationRequest? request}) {
     final isEditing = request != null;
-    final idController = TextEditingController(text: isEditing ? request.id.toString() : '');
-    final titleController = TextEditingController(text: isEditing ? (request.title ?? '') : 'Debug Notification');
-    final bodyController = TextEditingController(text: isEditing ? (request.body ?? '') : 'This is a test notification.');
+    final idController =
+        TextEditingController(text: isEditing ? request.id.toString() : '');
+    final titleController = TextEditingController(
+        text: isEditing ? (request.title ?? '') : 'Debug Notification');
+    final bodyController = TextEditingController(
+        text:
+            isEditing ? (request.body ?? '') : 'This is a test notification.');
     DateTime selectedTime = DateTime.now().add(const Duration(minutes: 1));
-    
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF242E38),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(isEditing ? 'Edit Notification' : 'Add Notification', style: const TextStyle(color: Colors.white)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isEditing ? 'Edit Notification' : 'Add Notification',
+              style: const TextStyle(color: Colors.white)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildTextField(idController, 'ID (Integer)', isEnabled: !isEditing),
+                _buildTextField(idController, 'ID (Integer)',
+                    isEnabled: !isEditing),
                 const SizedBox(height: 12),
                 _buildTextField(titleController, 'Title'),
                 const SizedBox(height: 12),
@@ -62,14 +69,16 @@ class _DebugScreenState extends State<DebugScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Time:', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+                    Text('Time:',
+                        style: TextStyle(color: Colors.white.withOpacity(0.7))),
                     TextButton(
                       onPressed: () async {
                         final date = await showDatePicker(
                           context: context,
                           initialDate: selectedTime,
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
                         );
                         if (date != null) {
                           final time = await showTimePicker(
@@ -78,12 +87,15 @@ class _DebugScreenState extends State<DebugScreen> {
                           );
                           if (time != null) {
                             setDialogState(() {
-                              selectedTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                              selectedTime = DateTime(date.year, date.month,
+                                  date.day, time.hour, time.minute);
                             });
                           }
                         }
                       },
-                      child: Text(DateFormat('MMM dd, HH:mm').format(selectedTime), style: const TextStyle(color: Color(0xFF4FC3F7))),
+                      child: Text(
+                          DateFormat('MMM dd, HH:mm').format(selectedTime),
+                          style: const TextStyle(color: Color(0xFF4FC3F7))),
                     ),
                   ],
                 ),
@@ -93,28 +105,35 @@ class _DebugScreenState extends State<DebugScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+              child: Text('Cancel',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5))),
             ),
             ElevatedButton(
               onPressed: () async {
+                final waterProvider =
+                    Provider.of<WaterProvider>(context, listen: false);
                 final id = int.tryParse(idController.text);
                 if (id == null) return;
 
-                await NotificationService().scheduleNotification(
+                await waterProvider.notificationService.scheduleNotification(
                   id,
                   titleController.text,
                   bodyController.text,
                   selectedTime,
                   {"amount": 250, "note": "Manual Debug"},
+                  waterProvider.settings!,
                 );
-                
+
                 Navigator.pop(context);
                 _loadPendingNotifications();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Notification ${isEditing ? 'updated' : 'added'}!')),
+                  SnackBar(
+                      content: Text(
+                          'Notification ${isEditing ? 'updated' : 'added'}!')),
                 );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4FC3F7)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4FC3F7)),
               child: Text(isEditing ? 'Update' : 'Schedule'),
             ),
           ],
@@ -123,7 +142,8 @@ class _DebugScreenState extends State<DebugScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool isEnabled = true}) {
+  Widget _buildTextField(TextEditingController controller, String label,
+      {bool isEnabled = true}) {
     return TextField(
       controller: controller,
       enabled: isEnabled,
@@ -133,7 +153,9 @@ class _DebugScreenState extends State<DebugScreen> {
         labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
         filled: true,
         fillColor: Colors.white.withOpacity(0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
       ),
     );
   }
@@ -147,9 +169,12 @@ class _DebugScreenState extends State<DebugScreen> {
     final highlightColor = const Color(0xFF4FC3F7);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1B232A) : const Color(0xFFF0F7FA),
+      backgroundColor:
+          isDark ? const Color(0xFF1B232A) : const Color(0xFFF0F7FA),
       appBar: AppBar(
-        title: const Text('DEBUG CONSOLE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2)),
+        title: const Text('DEBUG CONSOLE',
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -167,7 +192,8 @@ class _DebugScreenState extends State<DebugScreen> {
           Consumer<WaterProvider>(
             builder: (context, waterProvider, _) => ScaleButton(
               onTap: () async {
-                await waterProvider.notificationService.testNotification();
+                await waterProvider.notificationService
+                    .testNotification(waterProvider.settings!);
                 _loadPendingNotifications();
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: const Text(
@@ -184,7 +210,8 @@ class _DebugScreenState extends State<DebugScreen> {
                     border: Border.all(color: Colors.orange.withOpacity(0.3))),
                 child: Row(
                   children: [
-                    const Icon(Icons.bug_report, color: Colors.orange, size: 20),
+                    const Icon(Icons.bug_report,
+                        color: Colors.orange, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -223,13 +250,20 @@ class _DebugScreenState extends State<DebugScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Last Response Body', style: TextStyle(color: textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text('Last Response Body',
+                        style: TextStyle(
+                            color: textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
                     IconButton(
                       icon: Icon(Icons.copy, size: 16, color: highlightColor),
                       onPressed: () {
                         if (AiService.lastRawResponse != null) {
-                          Clipboard.setData(ClipboardData(text: AiService.lastRawResponse!));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
+                          Clipboard.setData(
+                              ClipboardData(text: AiService.lastRawResponse!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Copied to clipboard')));
                         }
                       },
                     ),
@@ -238,7 +272,10 @@ class _DebugScreenState extends State<DebugScreen> {
                 const Divider(),
                 Text(
                   AiService.lastRawResponse ?? "No AI response captured yet.",
-                  style: TextStyle(color: textPrimary, fontSize: 10, fontFamily: 'monospace'),
+                  style: TextStyle(
+                      color: textPrimary,
+                      fontSize: 10,
+                      fontFamily: 'monospace'),
                 ),
               ],
             ),
@@ -247,7 +284,9 @@ class _DebugScreenState extends State<DebugScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildSectionHeader('SCHEDULED NOTIFICATIONS (${_pendingNotifications.length})', highlightColor),
+              _buildSectionHeader(
+                  'SCHEDULED NOTIFICATIONS (${_pendingNotifications.length})',
+                  highlightColor),
               IconButton(
                 icon: Icon(Icons.refresh, size: 16, color: highlightColor),
                 onPressed: _loadPendingNotifications,
@@ -255,76 +294,89 @@ class _DebugScreenState extends State<DebugScreen> {
             ],
           ),
           if (_pendingNotifications.isEmpty)
-            Text('No pending notifications.', style: TextStyle(color: textSecondary))
+            Text('No pending notifications.',
+                style: TextStyle(color: textSecondary))
           else
             ..._pendingNotifications.map((n) => Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('ID: ${n.id}',
-                              style: TextStyle(
-                                  color: highlightColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12)),
-                          if (n.payload != null) ...[
-                            const SizedBox(width: 10),
-                            Builder(builder: (context) {
-                              try {
-                                final data = jsonDecode(n.payload!);
-                                if (data['scheduledAt'] != null) {
-                                  final date =
-                                      DateTime.parse(data['scheduledAt']);
-                                  return Text(
-                                    DateFormat('MMM dd, HH:mm').format(date),
-                                    style: TextStyle(
-                                        color: textSecondary,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold),
-                                  );
-                                }
-                              } catch (_) {}
-                              return const SizedBox.shrink();
-                            }),
-                          ],
+                          Row(
+                            children: [
+                              Text('ID: ${n.id}',
+                                  style: TextStyle(
+                                      color: highlightColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12)),
+                              if (n.payload != null) ...[
+                                const SizedBox(width: 10),
+                                Builder(builder: (context) {
+                                  try {
+                                    final data = jsonDecode(n.payload!);
+                                    if (data['scheduledAt'] != null) {
+                                      final date =
+                                          DateTime.parse(data['scheduledAt']);
+                                      return Text(
+                                        DateFormat('MMM dd, HH:mm')
+                                            .format(date),
+                                        style: TextStyle(
+                                            color: textSecondary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold),
+                                      );
+                                    }
+                                  } catch (_) {}
+                                  return const SizedBox.shrink();
+                                }),
+                              ],
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit,
+                                    size: 16, color: highlightColor),
+                                onPressed: () =>
+                                    _showNotificationDialog(request: n),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    size: 16, color: Colors.redAccent),
+                                onPressed: () async {
+                                  await NotificationService()
+                                      .cancelNotification(n.id);
+                                  _loadPendingNotifications();
+                                },
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.edit, size: 16, color: highlightColor),
-                            onPressed: () => _showNotificationDialog(request: n),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
-                            onPressed: () async {
-                              await NotificationService().cancelNotification(n.id);
-                              _loadPendingNotifications();
-                            },
-                          ),
-                        ],
-                      ),
+                      Text(n.title ?? 'No Title',
+                          style: TextStyle(
+                              color: textPrimary, fontWeight: FontWeight.bold)),
+                      Text(n.body ?? 'No Body',
+                          style: TextStyle(color: textSecondary, fontSize: 11)),
+                      if (n.payload != null) ...[
+                        const SizedBox(height: 4),
+                        Text('Payload: ${n.payload}',
+                            style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 9,
+                                fontFamily: 'monospace')),
+                      ],
                     ],
                   ),
-                  Text(n.title ?? 'No Title', style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold)),
-                  Text(n.body ?? 'No Body', style: TextStyle(color: textSecondary, fontSize: 11)),
-                  if (n.payload != null) ...[
-                    const SizedBox(height: 4),
-                    Text('Payload: ${n.payload}', style: TextStyle(color: textSecondary, fontSize: 9, fontFamily: 'monospace')),
-                  ],
-                ],
-              ),
-            )),
+                )),
           const SizedBox(height: 50),
         ],
       ),
@@ -334,7 +386,12 @@ class _DebugScreenState extends State<DebugScreen> {
   Widget _buildSectionHeader(String title, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Text(title, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+      child: Text(title,
+          style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1)),
     );
   }
 }
